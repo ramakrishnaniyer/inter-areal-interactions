@@ -19,7 +19,6 @@ class fr_transforms:
             return self.identity_cstr(self.tot_fr_df, unit_id, y_shape)
 
     def identity_cstr(self, tot_fr_df, unit_id, y_shape):
-        print(tot_fr_df.shape)
         X_cstr = np.array([]).reshape(tot_fr_df.shape[1], 0)
         if self.cstr_scale != 0:
             df_X = self.tot_fr_df.T.copy()

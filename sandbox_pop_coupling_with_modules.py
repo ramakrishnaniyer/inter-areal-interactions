@@ -135,7 +135,7 @@ class PC_sandbox:
         print('Maximum input is: ', np.amax(self.input_X))
         prs_df_unit = pd.DataFrame(index=range(1),columns = self.col_names)
 
-        fitlasso = fit_methods(self.input_X, self.y, self.frac, cv=10)
+        fitlasso = fit_methods(self.input_X, self.y, frac=self.frac, cv=10)
 
         alpha_val, train_corr, true_test_corr, params, nnz_coef, mse = fitlasso.fit()
         print('Finished analyzing unit ',  self.unit_id)

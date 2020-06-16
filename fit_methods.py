@@ -11,10 +11,12 @@ from sklearn.model_selection import KFold, cross_val_score, cross_val_predict
 
 
 class fit_methods:
-    def __init__(self, X, y, fit_method="lasso"):
+    def __init__(self, X, y, fit_method="lasso", **kwargs):
         self.X = X
         self.y = y
         self.fit_method = fit_method
+        self.frac = kwargs.get('frac', None)
+        self.cv = kwargs.get('cv', None)
 
     def fit(self, **kwargs):
         if self.fit_method == "lasso":
