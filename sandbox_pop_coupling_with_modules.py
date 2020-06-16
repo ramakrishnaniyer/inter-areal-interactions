@@ -58,7 +58,7 @@ class PC_sandbox:
             self.load_session_and_get_fr_df()
             
             self.make_output_vector()
-            print(self.tot_fr_df)
+            print(self.tot_fr_df.shape)
             fr_tr_methods = fr_transforms(self.tot_fr_df, 
                                           transform_method="identity",
                                           cstr_scale=self.cstr_scale,
