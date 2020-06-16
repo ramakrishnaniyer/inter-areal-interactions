@@ -19,7 +19,7 @@ from utils import load_stimulus_filtered_array
 class PC_sandbox:
     def __init__(self, yaml_fname = 'sg_a2a_full.yaml', expt_id = 715093703, cstr = 'VISp', unit_id = 950930407, stim_scale = 1):
         
-        config = yaml.load(open(yaml_fname, 'r'))
+        config = yaml.load(open(yaml_fname, 'r'), Loader=yaml.FullLoader)
         self.expt_id = str(expt_id) #str(config['expt_id'])
         self.data_dir = config['data_dir']
         self.nwb_path = os.path.join(self.data_dir,'ecephys_session_'+ self.expt_id + '.nwb')
@@ -58,6 +58,7 @@ class PC_sandbox:
             self.load_session_and_get_fr_df()
             
             self.make_output_vector()
+            print(self.tot_fr_df)
             fr_tr_methods = fr_transforms(self.tot_fr_df, 
                                           transform_method="identity",
                                           cstr_scale=self.cstr_scale,
