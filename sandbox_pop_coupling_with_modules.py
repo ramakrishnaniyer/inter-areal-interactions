@@ -10,7 +10,11 @@ import argparse
 #from allensdk.brain_observatory.ecephys.ecephys_project_cache import EcephysProjectCache
 from allensdk.brain_observatory.ecephys.ecephys_session import EcephysSession
 
-from pop_cpl_util_funcs import load_stimulus_filtered_array, fit_lasso
+from fit_methods import fit_methods
+from fr_transform_methods import fr_transforms
+
+from utils import load_stimulus_filtered_array
+#from pop_cpl_util_funcs import load_stimulus_filtered_array, fit_lasso
 
 class PC_sandbox:
     def __init__(self, yaml_fname = 'sg_a2a_full.yaml', expt_id = 715093703, cstr = 'VISp', unit_id = 950930407, stim_scale = 1):
@@ -54,7 +58,13 @@ class PC_sandbox:
             self.load_session_and_get_fr_df()
             
             self.make_output_vector()
-            self.make_cstr_input_matrix()
+            fr_tr_methods = fr_transforms(self.tot_fr_df, 
+                                          transform_method="identity",
+                                          cstr_scale=self.cstr_scale,
+                                          fit_type=self.fit_type)
+            self.X_cstr = fr_tr_methods.make_cstr_input_matrix(unit_id=self.unit_id,
+                                                               y_shape=self.y.shape)
+            #self.make_cstr_input_matrix()
             self.make_stim_input_matrix()
             
             self.input_X = np.concatenate((self.X_cstr, self.X_stim.T), axis=1)
@@ -96,7 +106,7 @@ class PC_sandbox:
         
     def make_output_vector(self):
         self.y = self.tot_fr_df.T[self.unit_id].values.astype(float)
-
+    '''
     def make_cstr_input_matrix(self):
         self.X_cstr = np.array([]).reshape(self.tot_fr_df.shape[1],0)
         if self.cstr_scale != 0:
@@ -107,9 +117,10 @@ class PC_sandbox:
 
             del df_X
         print('Cstr shape is :', self.X_cstr.shape)
+    '''
 
     def make_stim_input_matrix(self):
-        stim_arr_fname =  stim_arr_fname =  '/allen/programs/braintv/workgroups/cortexmodels/rami/Research/VC_NP_sklearn/gabor_filtered_'+self.stim_name+'_stim_corr.npy'
+        stim_arr_fname =  '/allen/programs/braintv/workgroups/cortexmodels/rami/Research/VC_NP_sklearn/gabor_filtered_'+self.stim_name+'_stim_corr.npy'
         self.X_stim = np.array([]).reshape(0,self.tot_fr_df.shape[1])
         if self.stim_scale != 0:
             stim_durn = self.bin_end - self.bin_start
@@ -123,7 +134,9 @@ class PC_sandbox:
         print('Maximum input is: ', np.amax(self.input_X))
         prs_df_unit = pd.DataFrame(index=range(1),columns = self.col_names)
 
-        alpha_val, train_corr, true_test_corr, params, nnz_coef, mse = fit_lasso(self.input_X, self.y, self.frac, cv = 10)
+        fitlasso = fit_methods(self.input_X, self.y, self.frac, cv=10)
+
+        alpha_val, train_corr, true_test_corr, params, nnz_coef, mse = fitlasso.fit()
         print('Finished analyzing unit ',  self.unit_id)
         print(self.unit_id, train_corr, true_test_corr, nnz_coef, mse)
         print('Optimal alpha_val: ',alpha_val)
