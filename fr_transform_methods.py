@@ -3,7 +3,7 @@ import numpy as np
 
 class fr_transforms:
     def __init__(self, tot_fr_df, transform_method="identity", **kwargs):
-        self.tot_fr_df = kwargs.get('tot_fr_df', None)
+        self.tot_fr_df = tot_fr_df
         self.cstr_scale = kwargs.get('cstr_scale', 0)
         self.fit_type = kwargs.get('fit_type', 'all_to_all')
         self.transform_method = transform_method

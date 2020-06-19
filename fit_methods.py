@@ -16,10 +16,12 @@ from scipy.linalg import norm
 
 
 class fit_methods:
-    def __init__(self, X, y, fit_method="lasso"):
+    def __init__(self, X, y, fit_method="lasso", **kwargs):
         self.X = X
         self.y = y
         self.fit_method = fit_method
+        self.frac = kwargs.get('frac', None)
+        self.cv = kwargs.get('cv', None)
 
     def fit(self, **kwargs):
         
