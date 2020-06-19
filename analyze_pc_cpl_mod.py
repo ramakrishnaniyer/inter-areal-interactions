@@ -17,6 +17,8 @@ import pandas as pd
 import pickle
 import random
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gs
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import pylab
 
 import itertools
@@ -143,7 +145,9 @@ def make_test_corr_box_plot(tmp1_df, fig_title, fig_savename = None):
     pylab.scatter(x,max_test_corr_vals_2,s=30)
     pylab.yticks()#(fontsize=30)
     print (box_plot)
-
+    
+    pylab.ylim([-0.1, 0.8])
+    
     pylab.title(fig_title)#, fontsize = 30)#(expt_id+ '_' + cstr, fontsize = 30)
     if fig_savename is not None:
         pylab.savefig(fig_savename)
@@ -297,6 +301,115 @@ def plot_cpl_matrix_hm(tgt_cstr, tgt_df, src_cstr, src_cstr_lyr_df, fig_savename
         
         return cpl_matrix
 
+'''
+Function to compute eigenvalues/singular values of coupling matrix and plot
+'''
+def get_and_plot_eval_cpl_mat(src_cstr_lyr_df, tgt_df, fig_savename = None):
+    
+    rec_mat = tgt_df[src_cstr_lyr_df.unit_id.values].fillna(0).values
+    print(rec_mat.shape)
+    if rec_mat.shape[0] == rec_mat.shape[1]:
+        w,v = np.linalg.eig(rec_mat)
+    else:
+        w1,v1 = np.linalg.eig(np.matmul(rec_mat, rec_mat.T))
+        w = np.sqrt(w1)
+
+    plt.figure(figsize = (5,5))
+    plt.plot(w.real,w.imag,'b.')
+    plt.xlim([-0.1, 0.2])
+    plt.ylim([-0.005, 0.005])
+    plt.vlines(0,-0.005, 0.005)
+    plt.xlabel('Re (w)')
+    plt.ylabel('Im (w)')
+    plt.tight_layout()
+    if fig_savename is not None:
+        plt.savefig(fig_savename)
+        #plt.close()
+    
+    plt.show(block = False)
+    
+    return w  
+
+'''
+Function to split coupling matrix by src and tgt layers and +ve/-ve couplings and obtain mean 'strength' and 'nsyn' 
+'''
+
+def get_mean_nnz_cpl_by_lyr(src_tmp, tgt_tmp):
+    mean_lyr_pos = np.zeros((8,8))
+    nnz_lyr_pos = np.zeros((4,4))
+    nnz_lyr_neg = np.zeros((4,4))
+
+    for jj,src_lyr in enumerate([2,4,5,6]):
+        src_units = src_tmp[src_tmp.layer==src_lyr].unit_id.values
+        tmp_df_main = tgt_tmp[list(src_units)]
+        for ii,tgt_lyr in enumerate([2,4,5,6]):
+            tmp_df = tmp_df_main.iloc[np.where(tgt_tmp.layer==tgt_lyr)[0],:]
+            nsyn_tot = len(~np.isnan(tmp_df.values.astype(float).flatten()))#tmp_df.shape[0]*tmp_df.shape[1]
+
+            mean_lyr_pos[ii,jj] = np.nanmean(tmp_df[tmp_df>0].values.astype(float).flatten())
+            mean_lyr_pos[ii+4,jj+4] = np.nanmean(tmp_df[tmp_df<0].values.astype(float).flatten())
+
+            nnz_pos = np.count_nonzero(~np.isnan(tmp_df[tmp_df>0].values.astype(float).flatten()))
+            nnz_neg = np.count_nonzero(~np.isnan(tmp_df[tmp_df<0].values.astype(float).flatten()))
+            nnz_lyr_pos[ii,jj] = nnz_pos/nsyn_tot
+            nnz_lyr_neg[ii,jj] = nnz_neg/nsyn_tot
+            
+    return mean_lyr_pos, nnz_lyr_pos, nnz_lyr_neg
+
+'''
+Functions to plot heatmap of connection probability
+'''
+def make_plot_on_gs(arr, fig, gs0, cmap_val = 'magma', max_val = None):
+    ax0 = fig.add_subplot(gs0)
+    if max_val is not None:
+        im0 = ax0.imshow(arr, cmap = cmap_val, vmin = 0, vmax = max_val)
+    else:
+        im0 = ax0.imshow(arr, cmap = cmap_val)
+        
+    divider = make_axes_locatable(ax0)
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    fig.colorbar(im0, cax=cax, orientation='vertical')
+    
+    ax0.set_xticks([0,1,2,3])
+    ax0.set_yticks([0,1,2,3])
+    
+    ax0.set_xticklabels(['2/3','4','5','6'])
+    ax0.set_yticklabels(['2/3','4','5','6'])
+
+def plot_hm_conn_prob(mean_lyr_pos, nnz_lyr_pos, nnz_lyr_neg, fig_savename = None):
+
+    mv_wts_pos = np.nanmax(np.abs(mean_lyr_pos[:4,:4]))
+    mv_wts_neg = np.nanmax(np.abs(mean_lyr_pos[4:,4:]))
+
+    mv_nsyn_pos = np.nanmax(np.abs(nnz_lyr_pos))
+    mv_nsyn_neg = np.nanmax(np.abs(nnz_lyr_neg))
+    
+    conn_pos = np.multiply(mean_lyr_pos[:4,:4],nnz_lyr_pos)#mean_lyr_pos[:4,:4]*nnz_lyr_pos
+    conn_neg = np.multiply(np.abs(mean_lyr_pos[4:,4:]),nnz_lyr_neg)#np.abs(mean_lyr_pos[4:,4:])*nnz_lyr_neg 
+    
+    mv_w = np.amax([mv_wts_pos, np.abs(mv_wts_neg)])
+    mv_n = np.amax([mv_nsyn_pos, np.abs(mv_nsyn_neg)])
+    mv_prob = np.amax([np.nanmax(conn_pos), np.nanmax(conn_neg)])
+
+    fig = plt.figure(figsize = (20,10))
+    gs = fig.add_gridspec(2, 3, figure=fig, width_ratios=[1., 1., 1.])
+
+    arr_pos_list = [mean_lyr_pos[:4,:4], nnz_lyr_pos, conn_pos]
+    #mval_pos_list = [mv_wts_pos, mv_nsyn_pos,None]
+
+    arr_neg_list = [np.abs(mean_lyr_pos[4:,4:]), nnz_lyr_neg, conn_neg]
+    #mval_neg_list = [mv_wts_neg, mv_nsyn_neg, None]
+    
+    mval_list = [mv_w, mv_n, mv_prob]
+
+    for ii, arr1, mv in zip(range(3), arr_pos_list, mval_list):
+        make_plot_on_gs(arr1, fig, gs[0,ii], cmap_val = 'magma', max_val = mv)
+
+    for ii, arr2, mv in zip(range(3), arr_neg_list, mval_list):
+        make_plot_on_gs(arr2, fig, gs[1,ii], cmap_val = 'magma', max_val = mv)
+        
+    if fig_savename is not None:
+        plt.savefig(fig_savename)
     
 #######################################################################################################################    
     
@@ -318,7 +431,7 @@ if __name__ == '__main__':
     ### ====== Everything above can be rolled in to already existing .yaml config files and loaded
 
     expt_id = '715093703' #['719161530']#['715093703'] #,'719161530'
-    cstr = 'VISp' #['LGd','LP','VISam','VISpm','VISp','VISl','VISrl']
+    cstr = 'VISl' #['LGd','LP','VISam','VISpm','VISp','VISl','VISrl']
     
     ### ==== The above two variables can be looped over using a for loop
     
@@ -341,13 +454,18 @@ if __name__ == '__main__':
 
         #Make figures directory inside directory containing parameters
         figs_savedir = os.path.join(basedir, expt_id, cstr, stim_name, 'Figures')
-        if not os.path.exists(figs_savedir):
-            os.makedirs(figs_savedir)
+        #if not os.path.exists(figs_savedir):
+        #    os.makedirs(figs_savedir)
 
         #Collect all filenames with maximum test correlation among stim scales
         max_fname_list = []
         for unit_id in visp_units:
-            max_fname = get_scale_fnames_with_max_test_corr_wvis(prs_df_dir, expt_id, cstr, unit_id)
+            try:
+                max_fname = get_scale_fnames_with_max_test_corr_wvis(prs_df_dir, expt_id, cstr, unit_id)
+            except:
+                print('prs .pkl does not exist for: ',unit_id)
+                pass
+                
             max_fname_list.append(max_fname)
 
         max_test_corr_dir = copy_params_files_to_max_test_corr_dir(prs_df_dir, max_fname_list)
@@ -361,29 +479,58 @@ if __name__ == '__main__':
 
         #Make test correlation boxplot
         fig_title = expt_id + '_' + cstr + '_wvis'
-        fig_summary = os.path.join(figs_savedir, 't1_'+str(bin_start) + '_t2_'+str(bin_end) + '_dt_'+str(bin_dt) +  '_wvis_summary.png')
-        if not os.path.isfile(fig_summary):
-            make_test_corr_box_plot(tmp1, fig_title, fig_savename = fig_summary)
+        
+        fig_dir = os.path.join(figs_savedir, 'test_corr')
+        if not os.path.exists(fig_dir):
+            os.makedirs(fig_dir)
+        fig_summary = os.path.join(fig_dir, 't1_'+str(bin_start) + '_t2_'+str(bin_end) + '_dt_'+str(bin_dt) +  '_wvis_summary.png')
+        
+        #if not os.path.isfile(fig_summary):
+        make_test_corr_box_plot(tmp1, fig_title, fig_savename = fig_summary)
 
         #Make stimulus coupling heatmap
-        fig_stim_nnz = os.path.join(figs_savedir, 't1_'+str(bin_start) + '_t2_'+str(bin_end) + '_dt_'+str(bin_dt) + '_stim_cpl.png')
+        fig_dir = os.path.join(figs_savedir, 'stim_cpl')
+        if not os.path.exists(fig_dir):
+            os.makedirs(fig_dir)     
+        fig_stim_nnz = os.path.join(fig_dir, 't1_'+str(bin_start) + '_t2_'+str(bin_end) + '_dt_'+str(bin_dt) + '_stim_cpl.png')
         if not os.path.isfile(fig_stim_nnz):
             make_stim_nnz_cpl_df_and_plot(tmp1,fig_savename = fig_stim_nnz)
 
-        #Make heatmap of NUMBER of non-zero cstr couplings
-        fig_cstr_nnz = os.path.join(figs_savedir, 't1_'+str(bin_start) + '_t2_'+str(bin_end) + '_dt_'+str(bin_dt) + '_wvis_nnz_cpl.png')
+#         #Make heatmap of NUMBER of non-zero cstr couplings
+#         fig_cstr_nnz = os.path.join(figs_savedir, 't1_'+str(bin_start) + '_t2_'+str(bin_end) + '_dt_'+str(bin_dt) + '_wvis_nnz_cpl.png')
         
-        if not os.path.isfile(fig_cstr_nnz):
-            nnz_cpl_from_cstr_counts = make_nnz_cpl_df(units_df, visp_units, tmp1)
-            normalize_and_plot_nnz_cpl_df(nnz_cpl_from_cstr_counts,units_df,visp_units,tmp1,\
-                                       cols_to_keep = None, fig_savename = fig_cstr_nnz)
+#         if not os.path.isfile(fig_cstr_nnz):
+#             nnz_cpl_from_cstr_counts = make_nnz_cpl_df(units_df, visp_units, tmp1)
+#             normalize_and_plot_nnz_cpl_df(nnz_cpl_from_cstr_counts,units_df,visp_units,tmp1,\
+#                                        cols_to_keep = None, fig_savename = fig_cstr_nnz)
 
         #Make heatmaps of intra and inter-areal coupling matrices
         src_cstr = 'VISp'
-        fig_hm_pc = os.path.join(figs_savedir, 't1_'+str(bin_start) + '_t2_'+str(bin_end) + '_dt_'+str(bin_dt) + '_' + src_cstr + '_to_' + cstr + '.png')
-        if not os.path.isfile(fig_hm_pc):
-            src_units_df, src_cstr_lyr_df_unsrt = make_units_with_lyr_for_cstr(expt_id, units_fname, layers_dir, src_cstr)
-            src_cstr_lyr_df = src_cstr_lyr_df_unsrt.sort_values('layer')     
+        src_units_df, src_cstr_lyr_df_unsrt = make_units_with_lyr_for_cstr(expt_id, units_fname, layers_dir, src_cstr)
+        src_cstr_lyr_df = src_cstr_lyr_df_unsrt.sort_values('layer')
+        
+        fig_dir = os.path.join(figs_savedir, 'cstr_cpl', src_cstr + '_to_' + cstr)
+        if not os.path.exists(fig_dir):
+            os.makedirs(fig_dir)
+        fig_hm_pc = os.path.join(fig_dir, 't1_'+str(bin_start) + '_t2_'+str(bin_end) + '_dt_'+str(bin_dt) + '_' + src_cstr + '_to_' + cstr + '.png')
+        if not os.path.isfile(fig_hm_pc):     
             cpl_mat = plot_cpl_matrix_hm(cstr, tmp1, src_cstr, src_cstr_lyr_df, fig_savename = fig_hm_pc)
+        
+        #Plot eigenvalues of coupling matrices
+        fig_dir = os.path.join(figs_savedir, 'cstr_eig_val', src_cstr + '_to_' + cstr)
+        if not os.path.exists(fig_dir):
+            os.makedirs(fig_dir)
+        fig_eval_pc = os.path.join(fig_dir, 't1_'+str(bin_start) + '_t2_'+str(bin_end) + '_dt_'+str(bin_dt) + '_' + src_cstr + '_to_' + cstr + '_eig_val.png')
+        if not os.path.isfile(fig_eval_pc):
+            w = get_and_plot_eval_cpl_mat(src_cstr_lyr_df, tmp1, fig_savename = fig_eval_pc)
+            
+        #Obtain and plot heatmaps of connection probability between laminae
+        mean_lyr_pos, nnz_lyr_pos, nnz_lyr_neg = get_mean_nnz_cpl_by_lyr(src_cstr_lyr_df, tmp1)
+        fig_dir = os.path.join(figs_savedir, 'conn_prob', src_cstr + '_to_' + cstr)
+        if not os.path.exists(fig_dir):
+            os.makedirs(fig_dir)
+        fig_conn_prob_pc = os.path.join(fig_dir, 't1_'+str(bin_start) + '_t2_'+str(bin_end) + '_dt_'+str(bin_dt) + '_' + src_cstr + '_to_' + cstr + '_conn_prob.png')
+        if not os.path.isfile(fig_conn_prob_pc):
+            plot_hm_conn_prob(mean_lyr_pos, nnz_lyr_pos, nnz_lyr_neg, fig_savename = fig_conn_prob_pc)
 
 
