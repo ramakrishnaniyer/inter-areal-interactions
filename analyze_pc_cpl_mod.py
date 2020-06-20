@@ -88,6 +88,7 @@ def copy_params_files_to_max_test_corr_dir(params_df_dir, max_fname_list):
 
 '''
 Function to return PC params filenames with maximum test correlation for different stimulus scales for given unit_id
+
 '''
 def get_scale_fnames_with_max_test_corr_wvis(prs_df_dir, expt_id, cstr, unit_id):
     
