@@ -5,6 +5,8 @@ from pbstools import PythonJob
 import os
 import numpy as np
 import pandas as pd
+import subprocess
+import time
  
 dryrun = False # if True, prints what script would be to screen but DOESN'T RUN
 conda_env = 'py36'
@@ -47,13 +49,25 @@ for expt_id in expt_id_list:
     units_savename = os.path.join(units_savedir,expt_id + '_units_df.pkl')
     units_df = pd.read_pickle(units_savename)
 
+    jobcount = 0
+
     for cstr in cstr_list:
         visp_units = units_df[units_df.ecephys_structure_acronym ==cstr].index.values
+
+        no_of_jobs = len(visp_units) * len(stim_scale_list)
+        while (jobcount + no_of_jobs) >= 8000:
+            time.sleep(30)
+            out = subprocess.Popen(["qstat", "-u rami"], stdout=subprocess.PIPE)
+            out2 = subprocess.Popen(["wc", "-l"], stdin=out.stdout, 
+                                     stdout=subprocess.PIPE).communicate()[0].strip('\n')
+            jobcount = int(float(out2))
+
         if len(visp_units) > 0:
+            jobcount = jobcount + no_of_jobs
             for unit_id in visp_units:
                 for stim_scale in stim_scale_list:
                     job_settings['jobname'] = '%s:%s:%s:%s:%s' % (jobname, expt_id, cstr, unit_id, stim_scale)
-                    
+                        
                     PythonJob(os.path.join(basedir,'sandbox_pop_coupling_with_modules.py'),
                             python_args='--cstr=%s --expt_id=%s  --unit_id=%s --prs_yaml_fname=%s --stim_scale=%s' % (cstr, expt_id, unit_id, prs_yaml_fname, stim_scale),
                             conda_env=conda_env,
