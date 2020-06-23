@@ -10,8 +10,8 @@ import argparse
 #from allensdk.brain_observatory.ecephys.ecephys_project_cache import EcephysProjectCache
 from allensdk.brain_observatory.ecephys.ecephys_session import EcephysSession
 
-from fit_methods import fit_methods
-from fr_transform_methods import fr_transforms
+from .fit_methods import fit_methods
+from .fr_transform_methods import fr_transforms
 
 from utils import load_stimulus_filtered_array
 #from pop_cpl_util_funcs import load_stimulus_filtered_array, fit_lasso
