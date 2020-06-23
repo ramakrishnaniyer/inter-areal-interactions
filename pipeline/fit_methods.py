@@ -212,8 +212,3 @@ class fit_methods:
         print('Test corr is: ',np.corrcoef(y_test,np.squeeze(pred))[0,1])
         
         return pred
-    
-    
-    
-    
-    
