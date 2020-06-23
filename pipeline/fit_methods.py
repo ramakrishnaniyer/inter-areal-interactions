@@ -33,12 +33,16 @@ class fit_methods:
             return alpha, train_corr, test_corr, coef_, nnz_coef, mse
         elif self.fit_method == "ols":
             pred = self.fit_ols(split_frac=split_frac)
+            return pred
         elif self.fit_method == 'pcr':
             pred = self.fit_pcr(split_frac=split_frac, cv=cv)
+            return pred
         elif self.fit_method == 'pls':
             pred = self.fit_pls(split_frac=split_frac, cv=cv)
+            return pred
         elif self.fit_method == 'rrr':
-            pred = self.fit_rrr(split_frac=split_frac, cv=cv)       
+            pred = self.fit_rrr(split_frac=split_frac, cv=cv)   
+            return pred    
         
 
     def fit_lasso(self, split_frac = 0.5, cv = 10):
@@ -136,19 +140,19 @@ class fit_methods:
             score = model_selection.cross_val_score(pls, scale(X_train), y_train, cv=kf_10, scoring='neg_mean_squared_error').mean()
             mse.append(-score)
 
-#         # Plot results
-#         plt.plot(np.arange(1, 8), np.array(mse), '-v')
-#         plt.xlabel('Number of PLS components in regression')
-#         plt.ylabel('MSE')
+        ## Plot results
+        #plt.plot(np.arange(1, 8), np.array(mse), '-v')
+        #plt.xlabel('Number of PLS components in regression')
+        #plt.ylabel('MSE')
 
         pls = PLSRegression(n_components=np.argmin(mse))
         pls.fit(scale(X_train), y_train)
         pred = np.squeeze(pls.predict(scale(X_test)))
 
-#         plt.figure()
-#         plt.plot(y_test)
-#         plt.plot(pred)
-#         plt.show()
+        #plt.figure()
+        #plt.plot(y_test)
+        #plt.plot(pred)
+        #plt.show()
 
         print('MSE is: ', mean_squared_error(y_test, pred))
         print('Test corr is: ',np.corrcoef(y_test,pred)[0,1])
@@ -203,10 +207,10 @@ class fit_methods:
         rr = ReducedRankRegressor(scale(X_train), y_train, rank_val, reg = 1)
         pred = rr.predict(scale(X_test))
 
-#         plt.figure()
-#         plt.plot(y_test)
-#         plt.plot(pred)
-#         plt.show()
+        #plt.figure()
+        #plt.plot(y_test)
+        #plt.plot(pred)
+        #plt.show()
 
         print('MSE is: ', mean_squared_error(y_test, pred))
         print('Test corr is: ',np.corrcoef(y_test,np.squeeze(pred))[0,1])
