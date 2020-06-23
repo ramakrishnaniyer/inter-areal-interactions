@@ -5,34 +5,32 @@ import pandas as pd
 import time
 import random
 import argparse
-
-#import allensdk
-#from allensdk.brain_observatory.ecephys.ecephys_project_cache import EcephysProjectCache
 from allensdk.brain_observatory.ecephys.ecephys_session import EcephysSession
 
 from .fit_methods import fit_methods
 from .fr_transform_methods import fr_transforms
 
 from utils import load_stimulus_filtered_array
-#from pop_cpl_util_funcs import load_stimulus_filtered_array, fit_lasso
 
 class PC_sandbox:
     def __init__(self, yaml_fname = 'sg_a2a_full.yaml', expt_id = 715093703, cstr = 'VISp', unit_id = 950930407, stim_scale = 1):
         
+        ''' 
+        Load config file with init variables and initialize
+        '''
         config = yaml.load(open(yaml_fname, 'r'), Loader=yaml.FullLoader)
         self.expt_id = str(expt_id) #str(config['expt_id'])
         self.data_dir = config['data_dir']
         self.nwb_path = os.path.join(self.data_dir,'ecephys_session_'+ self.expt_id + '.nwb')
         self.yaml_fname = yaml_fname
         
-        self.cstr = cstr #config['cstr']
-        self.unit_id = unit_id #config['unit_id']
+        self.cstr = cstr 
+        self.unit_id = unit_id
 
         self.frac = config['frac']
         self.stim_name = config['stim_name']
-        #self.dt = config['dt']
         
-        self.stim_scale = stim_scale#config['stim_scale']
+        self.stim_scale = stim_scale
         self.cstr_scale = config['cstr_scale']
         
         self.fit_type = config['fit_type']
@@ -42,7 +40,6 @@ class PC_sandbox:
         self.bin_end = config['bin_end']
         self.bin_dt = config['bin_dt']
         self.bin_edges = np.arange(self.bin_start, self.bin_end + 0.001, self.bin_dt)
-        #print(self.bin_start, self.bin_end, self.bin_edges, len(self.bin_edges))
         self.prs_savedir =  os.path.join(config['prs_savedir'], self.expt_id, self.cstr, \
             self.stim_name, 't1_'+str(self.bin_start) + '_t2_'+str(self.bin_end) + '_dt_'+str(self.bin_dt))
 
@@ -53,25 +50,35 @@ class PC_sandbox:
         prs_save_str = prs_save_str = separator.join([str(self.unit_id), 'fr_scale',str(self.cstr_scale), 'stim_scale', str(self.stim_scale)]) + '.pkl'
         self.prs_savename = os.path.join(self.prs_savedir,prs_save_str)
         
+        ## Execute following lines if parameter file does not exist
         if not os.path.isfile(self.prs_savename):
-            ##### MAIN STEPS
-            self.load_session_and_get_fr_df()
+
+            ##### MAIN STEPS ########
+            self.load_session_and_get_fr_df()  # load .nwb file and get activities
             
-            self.make_output_vector()
-            print(self.tot_fr_df.shape)
+            self.make_output_vector()          # make output vector for single unit 
+
+            # Create transformer for neuronal activity as per model requirement 
             fr_tr_methods = fr_transforms(self.tot_fr_df, 
                                           transform_method="identity",
                                           cstr_scale=self.cstr_scale,
                                           fit_type=self.fit_type)
+
+            # Make input array
             self.X_cstr = fr_tr_methods.make_cstr_input_matrix(unit_id=self.unit_id,
                                                                y_shape=self.y.shape)
-            #self.make_cstr_input_matrix()
+
+            # Make stimulus input array
             self.make_stim_input_matrix()
             
+            # Combine activities and stimulus input arrays
             self.input_X = np.concatenate((self.X_cstr, self.X_stim.T), axis=1)
             print('Shape of input is :', self.input_X.shape)
 
+            # Get column names for dataframe to save coupling coefficients
             self.get_prs_df_col_names()
+
+            # Fit GLM 
             self.get_glm_fit_prs_new()
             #################
         else:
@@ -107,18 +114,6 @@ class PC_sandbox:
         
     def make_output_vector(self):
         self.y = self.tot_fr_df.T[self.unit_id].values.astype(float)
-    '''
-    def make_cstr_input_matrix(self):
-        self.X_cstr = np.array([]).reshape(self.tot_fr_df.shape[1],0)
-        if self.cstr_scale != 0:
-            df_X = self.tot_fr_df.T.copy()
-            if self.fit_type == 'all_to_all':
-                df_X[self.unit_id] = np.zeros(self.y.shape)
-                self.X_cstr = self.cstr_scale*np.array(df_X)
-
-            del df_X
-        print('Cstr shape is :', self.X_cstr.shape)
-    '''
 
     def make_stim_input_matrix(self):
         stim_arr_fname =  '/allen/programs/braintv/workgroups/cortexmodels/rami/Research/VC_NP_sklearn/gabor_filtered_'+self.stim_name+'_stim_corr.npy'
